@@ -33,7 +33,7 @@ func getLogFiles() (logFileNames []string, err error) {
 }
 
 func analyzeFile(fileName string) (requestsCount int, err error) {
-	fmt.Printf("Analyzing '%s' ....", fileName)
+	fmt.Printf("Analyzing '%s' ....\n", fileName)
 	file, err := os.Open(fileName)
 	if err != nil {
 		return requestsCount, err
@@ -64,5 +64,7 @@ func main() {
 		sum += c
 	}
 
-	fmt.Println(sum)
+	fmt.Println("\n======")
+	fmt.Println("Number of files: ", len(logFileNames))
+	fmt.Println("Number of lines: ", sum)
 }
