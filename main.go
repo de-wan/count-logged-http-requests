@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -32,23 +34,53 @@ func getLogFiles() (logFileNames []string, err error) {
 	return logFileNames, err
 }
 
-func analyzeFile(fileName string) (requestsCount int, err error) {
+func getMinuteSecond(lineText string) (mnt int, sec int) {
+	re := regexp.MustCompile(`\d{2}:(\d{2}):(\d{2})`)
+	x := re.FindStringSubmatch(lineText)
+
+	if len(x) == 3 {
+		mnt, _ = strconv.Atoi(x[1])
+		sec, _ = strconv.Atoi(x[2])
+	}
+
+	return mnt, sec
+}
+
+func analyzeFile(fileName string) (requestsCount int, maxReqPerSec int, err error) {
 	fmt.Printf("Analyzing '%s' ....\n", fileName)
 	file, err := os.Open(fileName)
 	if err != nil {
-		return requestsCount, err
+		return requestsCount, maxReqPerSec, err
 	}
 	defer file.Close()
+
+	maxReqPerSec = 0
+	curReqPerSec := 0
+	prevSec := 0
+	prevMin := 0
 
 	s := bufio.NewScanner(file)
 	for s.Scan() {
 		lineText := s.Text()
+
+		curMin, curSec := getMinuteSecond(lineText)
+		if curSec == prevSec && curMin == prevMin {
+			curReqPerSec += 1
+		} else {
+			if curReqPerSec > maxReqPerSec {
+				maxReqPerSec = curReqPerSec
+			}
+			curReqPerSec = 1
+			prevSec = curSec
+			prevMin = curMin
+		}
+
 		if strings.Contains(lineText, "HTTP") {
 			requestsCount += 1
 		}
 	}
 
-	return requestsCount, nil
+	return requestsCount, maxReqPerSec, nil
 }
 
 func main() {
@@ -58,13 +90,19 @@ func main() {
 		return
 	}
 
+	maxPerSec := 0
+
 	sum := 0
 	for _, logFileName := range logFileNames {
-		c, _ := analyzeFile(logFileName)
-		sum += c
+		x, curMaxPerSecond, _ := analyzeFile(logFileName)
+		sum += x
+		if curMaxPerSecond > maxPerSec {
+			maxPerSec = curMaxPerSecond
+		}
 	}
 
 	fmt.Println("\n======")
 	fmt.Println("Number of files: ", len(logFileNames))
 	fmt.Println("Number of lines: ", sum)
+	fmt.Println("Max per second: ", maxPerSec)
 }
